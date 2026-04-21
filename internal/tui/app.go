@@ -39,9 +39,12 @@ type App struct {
 }
 
 type AppConfig struct {
-	OutputDir    string
-	MoviesSubdir string
-	Languages    []string // preferred subtitle languages (used by v0.2 matcher; not MVP)
+	OutputDir       string
+	MoviesSubdir    string
+	TVSubdir        string
+	Languages       []string // preferred subtitle languages (external only)
+	ResolutionOrder []int    // preferred video heights, most-preferred first
+	KeywordBoost    []string // source-name keywords used as tie-breakers
 }
 
 func NewApp(ctx context.Context, client *emby.Client, queue *downloader.Queue, cfg AppConfig) *App {

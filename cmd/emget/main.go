@@ -114,9 +114,12 @@ func run() error {
 
 	// TUI
 	app := tui.NewApp(ctx, client, queue, tui.AppConfig{
-		OutputDir:    cfg.Download.OutputDir,
-		MoviesSubdir: cfg.Download.MoviesSubdir,
-		Languages:    cfg.Subtitles.PreferredLanguages,
+		OutputDir:       cfg.Download.OutputDir,
+		MoviesSubdir:    cfg.Download.MoviesSubdir,
+		TVSubdir:        cfg.Download.TVSubdir,
+		Languages:       cfg.Subtitles.PreferredLanguages,
+		ResolutionOrder: cfg.Versions.ResolutionOrder,
+		KeywordBoost:    cfg.Versions.KeywordBoost,
 	})
 	program := tea.NewProgram(app, tea.WithContext(ctx))
 	_, err = program.Run()
