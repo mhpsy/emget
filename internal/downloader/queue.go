@@ -2,6 +2,7 @@ package downloader
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -135,9 +136,18 @@ func (q *Queue) runOne(ctx context.Context, t *Task) {
 		}
 	}
 
-	err := runWithRetries(ctx, q.cfg.MaxRetries, q.cfg.RetryBase, nil, func(ctx context.Context) error {
-		return q.cfg.Runner.Run(ctx, t, onProgress)
-	})
+	var err error
+	func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				err = fmt.Errorf("panic in downloader: %v", rec)
+			}
+		}()
+		err = runWithRetries(ctx, q.cfg.MaxRetries, q.cfg.RetryBase, nil, func(ctx context.Context) error {
+			return q.cfg.Runner.Run(ctx, t, onProgress)
+		})
+	}()
+
 	if err != nil {
 		t.Status = StatusFailed
 		t.LastError = err.Error()

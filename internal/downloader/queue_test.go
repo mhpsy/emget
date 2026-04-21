@@ -157,3 +157,47 @@ func TestQueue_ContextCancel_StopsLoop(t *testing.T) {
 		t.Fatal("queue did not stop within 1s after ctx cancel")
 	}
 }
+
+type panicRunner struct{}
+
+func (p *panicRunner) Run(ctx context.Context, t *Task, _ ProgressFn) error {
+	panic("boom")
+}
+
+func TestQueue_RecoversFromPanicInRunner(t *testing.T) {
+	fs := &fakeStore{}
+	q := NewQueue(QueueConfig{
+		Runner: &panicRunner{},
+		Store:  fs,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	q.Start(ctx)
+	defer q.Stop()
+
+	failedEvent := make(chan Event, 4)
+	go func() {
+		for ev := range q.Events() {
+			if ev.Kind == EventFailed {
+				select {
+				case failedEvent <- ev:
+				default:
+				}
+			}
+		}
+	}()
+
+	q.Enqueue(&Task{ID: "p1"})
+	q.Enqueue(&Task{ID: "p2"})
+
+	seen := 0
+	timeout := time.After(2 * time.Second)
+	for seen < 2 {
+		select {
+		case <-failedEvent:
+			seen++
+		case <-timeout:
+			t.Fatalf("only %d failed events received", seen)
+		}
+	}
+}
