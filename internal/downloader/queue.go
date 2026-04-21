@@ -135,7 +135,9 @@ func (q *Queue) runOne(ctx context.Context, t *Task) {
 		}
 	}
 
-	err := q.cfg.Runner.Run(ctx, t, onProgress)
+	err := runWithRetries(ctx, q.cfg.MaxRetries, q.cfg.RetryBase, nil, func(ctx context.Context) error {
+		return q.cfg.Runner.Run(ctx, t, onProgress)
+	})
 	if err != nil {
 		t.Status = StatusFailed
 		t.LastError = err.Error()

@@ -99,10 +99,12 @@ func run() error {
 	dl := downloader.New(httpClient)
 	dl.SetUserAgent(cfg.Download.UserAgent)
 	queue := downloader.NewQueue(downloader.QueueConfig{
-		Runner: dl,
-		Store:  store,
-		Delay:  cfg.Download.InterDownloadDelay,
-		Jitter: cfg.Download.Jitter,
+		Runner:     dl,
+		Store:      store,
+		Delay:      cfg.Download.InterDownloadDelay,
+		Jitter:     cfg.Download.Jitter,
+		MaxRetries: cfg.Download.MaxRetries,
+		RetryBase:  cfg.Download.RetryBackoff,
 	})
 	queue.Start(ctx)
 	defer queue.Stop()
