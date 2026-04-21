@@ -1,0 +1,8 @@
+{
+  "Items": [
+    {"Id": "season-1", "Name": "Season 1", "Type": "Season", "IndexNumber": 1},
+    {"Id": "season-2", "Name": "Season 2", "Type": "Season", "IndexNumber": 2},
+    {"Id": "season-3", "Name": "Season 3", "Type": "Season", "IndexNumber": 3}
+  ],
+  "TotalRecordCount": 3
+}
