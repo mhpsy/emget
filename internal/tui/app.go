@@ -17,6 +17,7 @@ const (
 	screenDetailMovie
 	screenDetailSeries
 	screenProgress
+	screenStartup
 )
 
 type screen interface {
@@ -62,6 +63,7 @@ func NewApp(ctx context.Context, client *emby.Client, queue *downloader.Queue, c
 	a.screens[screenDetailMovie] = newDetailMovieScreen(a)
 	a.screens[screenDetailSeries] = newDetailSeriesScreen(a)
 	a.screens[screenProgress] = newProgressScreen(a)
+	a.screens[screenStartup] = newStartupScreen(a)
 	return a
 }
 
@@ -124,4 +126,24 @@ func (a *App) View() string {
 
 func flash(msg string, isErr bool) tea.Cmd {
 	return func() tea.Msg { return flashMsg{text: msg, isErr: isErr} }
+}
+
+// ScreenStartup returns the screenID for the startup recovery screen so that
+// callers outside the package can request it without knowing the private enum.
+func ScreenStartup() screenID {
+	return screenStartup
+}
+
+// SetInitialScreen must be called before the bubbletea program starts.
+// It sets which screen is shown first. Default is screenSearch.
+func (a *App) SetInitialScreen(id screenID) {
+	a.current = id
+}
+
+// SeedStartup populates the startup recovery screen with pending tasks.
+// Safe to call before NewProgram.Run.
+func (a *App) SeedStartup(pending []*downloader.Task) {
+	if s, ok := a.screens[screenStartup].(*startupScreen); ok {
+		s.SetPending(pending)
+	}
 }
