@@ -136,7 +136,6 @@ func (u unimplementedScreen) Init() tea.Cmd                      { return nil }
 func (u unimplementedScreen) Update(tea.Msg) (tea.Cmd, screenID) { return nil, -1 }
 func (u unimplementedScreen) View() string                       { return u.name + " (stub)" }
 
-func newSearchScreen(*App) screen      { return unimplementedScreen{"search"} }
 func newResultsScreen(*App) screen     { return unimplementedScreen{"results"} }
 func newDetailMovieScreen(*App) screen { return unimplementedScreen{"detail_movie"} }
 func newProgressScreen(*App) screen    { return unimplementedScreen{"progress"} }
