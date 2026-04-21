@@ -50,10 +50,16 @@ func (r *resultsScreen) Update(msg tea.Msg) (tea.Cmd, screenID) {
 				return nil, -1
 			}
 			selected := r.items[r.cursor]
-			if selected.Type == emby.TypeMovie {
+			switch selected.Type {
+			case emby.TypeMovie:
 				return r.loadMovieDetail(selected.ID), -1
+			case emby.TypeSeries:
+				ds := r.app.screens[screenDetailSeries].(*detailSeriesScreen)
+				ds.setSeries(&selected)
+				return nil, screenDetailSeries
+			default:
+				return flash("unsupported item type: "+string(selected.Type), true), -1
 			}
-			return flash("series support coming in v0.2", true), -1
 		case "esc":
 			return nil, screenSearch
 		}
