@@ -120,20 +120,6 @@ func (a *App) View() string {
 	return top + "\n" + body + bar
 }
 
-// switchTo returns a tea.Cmd that signals the root App to swap the active screen.
-func switchTo(id screenID) tea.Cmd {
-	return func() tea.Msg { return switchScreenMsg{to: id} }
-}
-
 func flash(msg string, isErr bool) tea.Cmd {
 	return func() tea.Msg { return flashMsg{text: msg, isErr: isErr} }
 }
-
-// Stubs (full implementations in later tasks).
-type unimplementedScreen struct{ name string }
-
-func (u unimplementedScreen) Init() tea.Cmd                      { return nil }
-func (u unimplementedScreen) Update(tea.Msg) (tea.Cmd, screenID) { return nil, -1 }
-func (u unimplementedScreen) View() string                       { return u.name + " (stub)" }
-
-func newProgressScreen(*App) screen { return unimplementedScreen{"progress"} }
