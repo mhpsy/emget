@@ -132,6 +132,15 @@ func run() error {
 		ResolutionOrder: cfg.Versions.ResolutionOrder,
 		KeywordBoost:    cfg.Versions.KeywordBoost,
 	})
+
+	// Startup recovery: if state has unfinished tasks, show the recovery screen first.
+	pending := unfinishedTasks(store)
+	if len(pending) > 0 {
+		log.Info("unfinished tasks detected", "count", len(pending))
+		app.SetInitialScreen(tui.ScreenStartup())
+		app.SeedStartup(pending)
+	}
+
 	program := tea.NewProgram(app, tea.WithContext(ctx))
 	_, err = program.Run()
 	if err != nil {
@@ -182,4 +191,14 @@ func expandHome(path string) string {
 		}
 	}
 	return path
+}
+
+func unfinishedTasks(store *state.Store) []*downloader.Task {
+	var out []*downloader.Task
+	for _, t := range store.Tasks() {
+		if t.Status != downloader.StatusCompleted {
+			out = append(out, t)
+		}
+	}
+	return out
 }
