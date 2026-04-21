@@ -124,7 +124,7 @@ func run() error {
 	cfg.Download.OutputDir = expandHome(cfg.Download.OutputDir)
 
 	// TUI
-	app := tui.NewApp(ctx, client, queue, tui.AppConfig{
+	app := tui.NewApp(ctx, client, queue, store, tui.AppConfig{
 		OutputDir:       cfg.Download.OutputDir,
 		MoviesSubdir:    cfg.Download.MoviesSubdir,
 		TVSubdir:        cfg.Download.TVSubdir,

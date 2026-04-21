@@ -30,6 +30,7 @@ type App struct {
 	ctx    context.Context
 	client *emby.Client
 	queue  *downloader.Queue
+	store  StoreClearer
 	cfg    AppConfig
 
 	current screenID
@@ -49,11 +50,19 @@ type AppConfig struct {
 	KeywordBoost    []string // source-name keywords used as tie-breakers
 }
 
-func NewApp(ctx context.Context, client *emby.Client, queue *downloader.Queue, cfg AppConfig) *App {
+// StoreClearer is the minimal store interface the TUI needs for the startup
+// recovery screen. Satisfied by *state.Store.
+type StoreClearer interface {
+	Clear()
+	Save() error
+}
+
+func NewApp(ctx context.Context, client *emby.Client, queue *downloader.Queue, store StoreClearer, cfg AppConfig) *App {
 	a := &App{
 		ctx:     ctx,
 		client:  client,
 		queue:   queue,
+		store:   store,
 		cfg:     cfg,
 		current: screenSearch,
 		screens: map[screenID]screen{},

@@ -103,6 +103,14 @@ func (s *Store) Delete(id string) {
 	}
 }
 
+// Clear removes all tasks from the store. Call Save() to persist.
+func (s *Store) Clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tasks = make(map[string]*downloader.Task)
+	s.order = nil
+}
+
 func (s *Store) Tasks() []*downloader.Task {
 	s.mu.Lock()
 	defer s.mu.Unlock()

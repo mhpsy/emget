@@ -67,8 +67,11 @@ func (s *startupScreen) applyDecision() tea.Cmd {
 		}
 		return flash(fmt.Sprintf("resumed %d task(s)", count), false)
 	case StartupDecisionClear:
-		// Task 9 will wire actual store clearing via an interface.
-		return flash("state will be cleared", false)
+		if s.app.store != nil {
+			s.app.store.Clear()
+			_ = s.app.store.Save()
+		}
+		return flash("state cleared", false)
 	}
 	return nil
 }

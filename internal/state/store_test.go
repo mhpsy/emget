@@ -70,3 +70,25 @@ func TestStore_Delete(t *testing.T) {
 		t.Errorf("tasks = %+v", s.Tasks())
 	}
 }
+
+func TestStore_Clear(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.json")
+	s := NewStore(path)
+	s.Upsert(&downloader.Task{ID: "a"})
+	s.Upsert(&downloader.Task{ID: "b"})
+	s.Save()
+
+	s.Clear()
+	if len(s.Tasks()) != 0 {
+		t.Errorf("in-memory tasks = %d, want 0", len(s.Tasks()))
+	}
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	s2 := NewStore(path)
+	s2.Load()
+	if len(s2.Tasks()) != 0 {
+		t.Errorf("reloaded tasks = %d, want 0", len(s2.Tasks()))
+	}
+}
