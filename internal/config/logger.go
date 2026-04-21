@@ -21,6 +21,13 @@ func SetupLogger(filePath, level string) (cleanup func(), err error) {
 	if err := EnsureDir(dirname(filePath)); err != nil {
 		return nil, err
 	}
+	// Rotate if existing log is too large (>10 MiB).
+	if info, err := os.Stat(filePath); err == nil && info.Size() > 10*1024*1024 {
+		_ = os.Remove(filePath + ".1")
+		if rerr := os.Rename(filePath, filePath+".1"); rerr != nil {
+			_ = rerr // non-fatal, fall through to append
+		}
+	}
 	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return nil, err
