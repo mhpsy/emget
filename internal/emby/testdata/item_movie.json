@@ -1,0 +1,31 @@
+{
+  "Id": "m-1",
+  "Name": "The Shawshank Redemption",
+  "Type": "Movie",
+  "ProductionYear": 1994,
+  "Overview": "Two imprisoned men bond...",
+  "MediaSources": [
+    {
+      "Id": "src-1",
+      "Name": "The Shawshank Redemption 1994 2160p BluRay",
+      "Container": "mkv",
+      "Size": 48318382080,
+      "MediaStreams": [
+        {"Index": 0, "Type": "Video", "Codec": "hevc", "Height": 2160, "Width": 3840},
+        {"Index": 1, "Type": "Audio", "Codec": "dts", "Language": "eng", "IsDefault": true},
+        {"Index": 2, "Type": "Subtitle", "Codec": "srt", "Language": "zho", "IsExternal": true, "Title": "Chinese"},
+        {"Index": 3, "Type": "Subtitle", "Codec": "srt", "Language": "eng", "IsExternal": true, "Title": "English"}
+      ]
+    },
+    {
+      "Id": "src-2",
+      "Name": "The Shawshank Redemption 1994 1080p WEB-DL",
+      "Container": "mp4",
+      "Size": 8589934592,
+      "MediaStreams": [
+        {"Index": 0, "Type": "Video", "Codec": "h264", "Height": 1080, "Width": 1920},
+        {"Index": 1, "Type": "Audio", "Codec": "aac", "Language": "eng", "IsDefault": true}
+      ]
+    }
+  ]
+}
