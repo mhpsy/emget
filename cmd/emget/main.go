@@ -72,6 +72,12 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	// Session handling:
+	//   - Load cached session from disk if not expired.
+	//   - If cache missing or expired, authenticate with config credentials.
+	//   - In-TUI 401s (token revoked mid-session) are logged but not auto-recovered
+	//     in v0.3 — surface a flash and let the user restart. Auto-recovery is
+	//     tracked for a future release.
 	if sess, err := config.LoadSession(sessionPath); err == nil && sess.ExpiresAt.After(time.Now()) {
 		client.SetSession(embySession(sess))
 		log.Info("loaded existing session", "user_id", sess.UserID, "expires_at", sess.ExpiresAt)
