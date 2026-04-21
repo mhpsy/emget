@@ -45,3 +45,26 @@ func MoviePaths(outputDir, moviesSubdir, title string, year int, videoExt, lang,
 	sub := filepath.Join(folder, base+"."+lang+"."+subExt)
 	return video, sub
 }
+
+// TVPaths returns (videoOutputPath, subtitleOutputPath) following the
+// convention <output>/<tvSubdir>/<Series>/Season <NN>/<Series> - S<NN>E<NN> - <Title>.<ext>.
+// Season numbers are zero-padded to 2 digits (min width); episode numbers use at
+// least 2 digits (3+ digits pass through). Empty episode titles are dropped
+// (no trailing " - ").
+func TVPaths(outputDir, tvSubdir, seriesName string, seasonNum, episodeNum int, episodeTitle, videoExt, lang, subExt string) (string, string) {
+	safeSeries := sanitize(seriesName)
+	safeTitle := sanitize(episodeTitle)
+	seasonFolder := fmt.Sprintf("Season %02d", seasonNum)
+	code := fmt.Sprintf("S%02dE%02d", seasonNum, episodeNum)
+	base := safeSeries + " - " + code
+	if safeTitle != "" {
+		base = base + " - " + safeTitle
+	}
+	folder := filepath.Join(outputDir, tvSubdir, safeSeries, seasonFolder)
+	video := filepath.Join(folder, base+"."+videoExt)
+	if lang == "" {
+		lang = "und"
+	}
+	sub := filepath.Join(folder, base+"."+lang+"."+subExt)
+	return video, sub
+}

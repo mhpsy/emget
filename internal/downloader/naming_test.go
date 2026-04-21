@@ -51,3 +51,47 @@ func TestMoviePaths_SanitizesTitle(t *testing.T) {
 		t.Errorf("\n got %q\nwant %q", out, want)
 	}
 }
+
+func TestTVPaths(t *testing.T) {
+	video, sub := TVPaths("/media", "TV", "True Detective", 1, 3, "The Locked Room", "mkv", "zho", "srt")
+	wantVideo := "/media/TV/True Detective/Season 01/True Detective - S01E03 - The Locked Room.mkv"
+	wantSub := "/media/TV/True Detective/Season 01/True Detective - S01E03 - The Locked Room.zho.srt"
+	if video != wantVideo {
+		t.Errorf("video\n got %q\nwant %q", video, wantVideo)
+	}
+	if sub != wantSub {
+		t.Errorf("sub\n got %q\nwant %q", sub, wantSub)
+	}
+}
+
+func TestTVPaths_SanitizesSeriesAndTitle(t *testing.T) {
+	video, _ := TVPaths("/media", "TV", "Bad:Series?", 2, 10, "Ep/Title", "mkv", "eng", "srt")
+	want := "/media/TV/Bad_Series_/Season 02/Bad_Series_ - S02E10 - Ep_Title.mkv"
+	if video != want {
+		t.Errorf("\n got %q\nwant %q", video, want)
+	}
+}
+
+func TestTVPaths_UnknownLanguage(t *testing.T) {
+	_, sub := TVPaths("/media", "TV", "X", 1, 1, "Pilot", "mkv", "", "srt")
+	want := "/media/TV/X/Season 01/X - S01E01 - Pilot.und.srt"
+	if sub != want {
+		t.Errorf("\n got %q\nwant %q", sub, want)
+	}
+}
+
+func TestTVPaths_EmptyEpisodeTitle(t *testing.T) {
+	video, _ := TVPaths("/media", "TV", "Show", 1, 2, "", "mkv", "zho", "srt")
+	want := "/media/TV/Show/Season 01/Show - S01E02.mkv"
+	if video != want {
+		t.Errorf("\n got %q\nwant %q", video, want)
+	}
+}
+
+func TestTVPaths_HighSeasonEpisodeNumbers(t *testing.T) {
+	video, _ := TVPaths("/media", "TV", "Big Show", 12, 100, "Finale", "mkv", "eng", "srt")
+	want := "/media/TV/Big Show/Season 12/Big Show - S12E100 - Finale.mkv"
+	if video != want {
+		t.Errorf("\n got %q\nwant %q", video, want)
+	}
+}
