@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -172,7 +173,11 @@ func (c *Client) url(path string) (string, error) {
 		return "", errors.New("emby: client has no base URL")
 	}
 	u := *c.base
-	u.Path = joinPath(u.Path, path)
+	p, q, hasQuery := strings.Cut(path, "?")
+	u.Path = joinPath(u.Path, p)
+	if hasQuery {
+		u.RawQuery = q
+	}
 	return u.String(), nil
 }
 
