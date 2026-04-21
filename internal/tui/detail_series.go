@@ -22,7 +22,9 @@ type detailSeriesScreen struct {
 	episodeErr       map[string]string
 	expanded         map[string]bool
 
-	cursor int // index into the flattened view
+	selected map[string]bool // episode IDs currently checked
+
+	cursor int
 }
 
 type row struct {
@@ -48,6 +50,7 @@ func newDetailSeriesScreen(a *App) screen {
 		loadingEpisodes:  map[string]bool{},
 		episodeErr:       map[string]string{},
 		expanded:         map[string]bool{},
+		selected:         map[string]bool{},
 	}
 }
 
@@ -60,6 +63,7 @@ func (d *detailSeriesScreen) setSeries(it *emby.Item) {
 	d.loadingEpisodes = map[string]bool{}
 	d.episodeErr = map[string]string{}
 	d.expanded = map[string]bool{}
+	d.selected = map[string]bool{}
 	d.cursor = 0
 }
 
@@ -127,8 +131,37 @@ func (d *detailSeriesScreen) handleKey(m tea.KeyMsg) (tea.Cmd, screenID) {
 		if d.cursor < len(rows) && rows[d.cursor].kind == rowSeason {
 			return d.toggleSeason(rows[d.cursor].seasonID), -1
 		}
+	case " ", "space":
+		if d.cursor >= len(rows) {
+			return nil, -1
+		}
+		r := rows[d.cursor]
+		switch r.kind {
+		case rowEpisode:
+			d.selected[r.episode.ID] = !d.selected[r.episode.ID]
+		case rowSeason:
+			d.toggleSeasonSelection(r.seasonID)
+		}
 	}
 	return nil, -1
+}
+
+func (d *detailSeriesScreen) toggleSeasonSelection(seasonID string) {
+	eps, ok := d.episodesBySeason[seasonID]
+	if !ok {
+		return
+	}
+	allSelected := len(eps) > 0
+	for _, ep := range eps {
+		if !d.selected[ep.ID] {
+			allSelected = false
+			break
+		}
+	}
+	target := !allSelected
+	for _, ep := range eps {
+		d.selected[ep.ID] = target
+	}
 }
 
 func (d *detailSeriesScreen) toggleSeason(seasonID string) tea.Cmd {
@@ -211,7 +244,10 @@ func (d *detailSeriesScreen) View() string {
 		}
 		b.WriteString(line + "\n")
 	}
-	b.WriteString("\n" + infoStyle.Render("tab/enter: expand, ↑/↓ move, esc: back"))
+	count := d.selectedCount()
+	status := fmt.Sprintf("%d episode(s) selected", count)
+	b.WriteString("\n" + infoStyle.Render(status))
+	b.WriteString("\n" + infoStyle.Render("tab/enter: expand, space: select, ↑/↓ move, esc: back"))
 	return b.String()
 }
 
@@ -222,14 +258,56 @@ func (d *detailSeriesScreen) renderRow(r row) string {
 		if d.expanded[r.seasonID] {
 			indicator = "▼"
 		}
-		return fmt.Sprintf("  %s %s", indicator, r.season.Name)
+		check := "[ ]"
+		if d.allEpisodesSelected(r.seasonID) {
+			check = checkedStyle.Render("[x]")
+		} else if d.anyEpisodesSelected(r.seasonID) {
+			check = "[~]"
+		}
+		return fmt.Sprintf("  %s %s %s", indicator, check, r.season.Name)
 	case rowEpisode:
 		code := fmt.Sprintf("S%02dE%02d", r.episode.ParentIndexNumber, r.episode.IndexNumber)
-		return fmt.Sprintf("      %s - %s", code, r.episode.Name)
+		check := "[ ]"
+		if d.selected[r.episode.ID] {
+			check = checkedStyle.Render("[x]")
+		}
+		return fmt.Sprintf("      %s %s - %s", check, code, r.episode.Name)
 	case rowEpisodeLoading:
 		return infoStyle.Render("      loading episodes...")
 	case rowEpisodeError:
 		return errorStyle.Render("      load failed: " + d.episodeErr[r.seasonID])
 	}
 	return ""
+}
+
+func (d *detailSeriesScreen) allEpisodesSelected(seasonID string) bool {
+	eps, ok := d.episodesBySeason[seasonID]
+	if !ok || len(eps) == 0 {
+		return false
+	}
+	for _, ep := range eps {
+		if !d.selected[ep.ID] {
+			return false
+		}
+	}
+	return true
+}
+
+func (d *detailSeriesScreen) anyEpisodesSelected(seasonID string) bool {
+	for _, ep := range d.episodesBySeason[seasonID] {
+		if d.selected[ep.ID] {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *detailSeriesScreen) selectedCount() int {
+	n := 0
+	for _, v := range d.selected {
+		if v {
+			n++
+		}
+	}
+	return n
 }
