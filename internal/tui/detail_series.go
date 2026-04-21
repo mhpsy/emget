@@ -3,10 +3,14 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/google/uuid"
 
+	"github.com/mhpsy/emget/internal/downloader"
 	"github.com/mhpsy/emget/internal/emby"
+	"github.com/mhpsy/emget/internal/matcher"
 )
 
 type detailSeriesScreen struct {
@@ -142,6 +146,8 @@ func (d *detailSeriesScreen) handleKey(m tea.KeyMsg) (tea.Cmd, screenID) {
 		case rowSeason:
 			d.toggleSeasonSelection(r.seasonID)
 		}
+	case "d":
+		return d.enqueueSelected(), screenProgress
 	}
 	return nil, -1
 }
@@ -247,7 +253,7 @@ func (d *detailSeriesScreen) View() string {
 	count := d.selectedCount()
 	status := fmt.Sprintf("%d episode(s) selected", count)
 	b.WriteString("\n" + infoStyle.Render(status))
-	b.WriteString("\n" + infoStyle.Render("tab/enter: expand, space: select, ↑/↓ move, esc: back"))
+	b.WriteString("\n" + infoStyle.Render("tab/enter: expand, space: select, d: enqueue, ↑/↓ move, esc: back"))
 	return b.String()
 }
 
@@ -310,4 +316,92 @@ func (d *detailSeriesScreen) selectedCount() int {
 		}
 	}
 	return n
+}
+
+// enqueueSelected builds and enqueues tasks for every selected episode.
+// Episodes that fail version matching are skipped silently (count reported in flash).
+// Subtitle language matching failures are non-fatal: the video task is enqueued
+// even if zero subtitle streams match.
+func (d *detailSeriesScreen) enqueueSelected() tea.Cmd {
+	if d.series == nil {
+		return flash("no series loaded", true)
+	}
+	versionRule := matcher.VersionRule{
+		ResolutionOrder: d.app.cfg.ResolutionOrder,
+		KeywordBoost:    d.app.cfg.KeywordBoost,
+	}
+	subRule := matcher.SubtitleRule{
+		Languages: d.app.cfg.Languages,
+		External:  true,
+	}
+
+	enqueued := 0
+	skipped := 0
+	for _, eps := range d.episodesBySeason {
+		for i := range eps {
+			ep := &eps[i]
+			if !d.selected[ep.ID] {
+				continue
+			}
+			src, err := matcher.PickVersion(ep.MediaSources, versionRule)
+			if err != nil {
+				skipped++
+				continue
+			}
+			ext := src.Container
+			if ext == "" {
+				ext = "mkv"
+			}
+			videoPath, _ := downloader.TVPaths(
+				d.app.cfg.OutputDir, d.app.cfg.TVSubdir,
+				d.series.Name, ep.ParentIndexNumber, ep.IndexNumber, ep.Name,
+				ext, "", "")
+
+			parentID := uuid.NewString()
+			videoTask := &downloader.Task{
+				ID:          parentID,
+				Kind:        downloader.KindVideo,
+				ItemID:      ep.ID,
+				SourceID:    src.ID,
+				StreamIndex: -1,
+				DisplayName: fmt.Sprintf("%s S%02dE%02d — %s", d.series.Name, ep.ParentIndexNumber, ep.IndexNumber, src.Name),
+				URL:         d.app.client.VideoDownloadURL(ep.ID, src.ID),
+				OutputPath:  videoPath,
+				Status:      downloader.StatusQueued,
+				CreatedAt:   time.Now().UTC(),
+			}
+			d.app.queue.Enqueue(videoTask)
+			enqueued++
+
+			subs := matcher.PickSubtitles(src.MediaStreams, subRule)
+			for _, s := range subs {
+				subExt := s.Codec
+				if subExt == "" {
+					subExt = "srt"
+				}
+				_, subPath := downloader.TVPaths(
+					d.app.cfg.OutputDir, d.app.cfg.TVSubdir,
+					d.series.Name, ep.ParentIndexNumber, ep.IndexNumber, ep.Name,
+					ext, subLang(s), subExt)
+				subTask := &downloader.Task{
+					ID:          uuid.NewString(),
+					ParentID:    parentID,
+					Kind:        downloader.KindSubtitle,
+					ItemID:      ep.ID,
+					SourceID:    src.ID,
+					StreamIndex: s.Index,
+					DisplayName: fmt.Sprintf("%s S%02dE%02d — sub %s", d.series.Name, ep.ParentIndexNumber, ep.IndexNumber, subLang(s)),
+					URL:         d.app.client.SubtitleDownloadURL(ep.ID, src.ID, s.Index, subExt),
+					OutputPath:  subPath,
+					Status:      downloader.StatusQueued,
+					CreatedAt:   time.Now().UTC(),
+				}
+				d.app.queue.Enqueue(subTask)
+				enqueued++
+			}
+		}
+	}
+	msg := fmt.Sprintf("enqueued %d task(s); %d episode(s) skipped (no matching version)", enqueued, skipped)
+	isErr := enqueued == 0
+	return flash(msg, isErr)
 }
