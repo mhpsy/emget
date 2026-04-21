@@ -15,6 +15,7 @@ const (
 	screenSearch screenID = iota
 	screenResults
 	screenDetailMovie
+	screenDetailSeries
 	screenProgress
 )
 
@@ -59,6 +60,7 @@ func NewApp(ctx context.Context, client *emby.Client, queue *downloader.Queue, c
 	a.screens[screenSearch] = newSearchScreen(a)
 	a.screens[screenResults] = newResultsScreen(a)
 	a.screens[screenDetailMovie] = newDetailMovieScreen(a)
+	a.screens[screenDetailSeries] = newDetailSeriesScreen(a)
 	a.screens[screenProgress] = newProgressScreen(a)
 	return a
 }
