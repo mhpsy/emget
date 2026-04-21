@@ -129,3 +129,31 @@ func TestQueue_FailedTaskMarkedFailed(t *testing.T) {
 		t.Fatal("no EventFailed received")
 	}
 }
+
+func TestQueue_ContextCancel_StopsLoop(t *testing.T) {
+	fr := &fakeRunner{}
+	fs := &fakeStore{}
+	q := NewQueue(QueueConfig{Runner: fr, Store: fs})
+	ctx, cancel := context.WithCancel(context.Background())
+	q.Start(ctx)
+
+	q.Enqueue(&Task{ID: "a"})
+	// wait for first task to run
+	timeout := time.After(1 * time.Second)
+	for fr.ran.Load() < 1 {
+		select {
+		case <-timeout:
+			t.Fatal("first task never ran")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	cancel()
+	done := make(chan struct{})
+	go func() { q.Stop(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(1 * time.Second):
+		t.Fatal("queue did not stop within 1s after ctx cancel")
+	}
+}
