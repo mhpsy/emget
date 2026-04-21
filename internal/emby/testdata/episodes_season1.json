@@ -1,0 +1,59 @@
+{
+  "Items": [
+    {
+      "Id": "ep-101",
+      "Name": "The Long Bright Dark",
+      "Type": "Episode",
+      "IndexNumber": 1,
+      "ParentIndexNumber": 1,
+      "SeriesId": "series-99",
+      "SeriesName": "True Detective",
+      "MediaSources": [
+        {
+          "Id": "src-101-a",
+          "Name": "True Detective S01E01 2160p BluRay",
+          "Container": "mkv",
+          "Size": 5100000000,
+          "MediaStreams": [
+            {"Index": 0, "Type": "Video", "Codec": "hevc", "Height": 2160, "Width": 3840},
+            {"Index": 1, "Type": "Audio", "Codec": "dts", "Language": "eng"},
+            {"Index": 2, "Type": "Subtitle", "Codec": "srt", "Language": "zho", "IsExternal": true, "Title": "Chinese"},
+            {"Index": 3, "Type": "Subtitle", "Codec": "srt", "Language": "eng", "IsExternal": true, "Title": "English"}
+          ]
+        },
+        {
+          "Id": "src-101-b",
+          "Name": "True Detective S01E01 1080p WEB-DL",
+          "Container": "mp4",
+          "Size": 1100000000,
+          "MediaStreams": [
+            {"Index": 0, "Type": "Video", "Codec": "h264", "Height": 1080, "Width": 1920},
+            {"Index": 1, "Type": "Audio", "Codec": "aac", "Language": "eng"}
+          ]
+        }
+      ]
+    },
+    {
+      "Id": "ep-102",
+      "Name": "Seeing Things",
+      "Type": "Episode",
+      "IndexNumber": 2,
+      "ParentIndexNumber": 1,
+      "SeriesId": "series-99",
+      "SeriesName": "True Detective",
+      "MediaSources": [
+        {
+          "Id": "src-102-a",
+          "Name": "True Detective S01E02 2160p BluRay",
+          "Container": "mkv",
+          "Size": 5200000000,
+          "MediaStreams": [
+            {"Index": 0, "Type": "Video", "Codec": "hevc", "Height": 2160, "Width": 3840},
+            {"Index": 2, "Type": "Subtitle", "Codec": "srt", "Language": "zho", "IsExternal": true}
+          ]
+        }
+      ]
+    }
+  ],
+  "TotalRecordCount": 2
+}
