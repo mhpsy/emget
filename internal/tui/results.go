@@ -61,10 +61,8 @@ func (r *resultsScreen) Update(msg tea.Msg) (tea.Cmd, screenID) {
 		if m.err != nil {
 			return flash("load detail failed: "+m.err.Error(), true), -1
 		}
-		// FIXME(task-20): restore once detailMovieScreen exists
-		// dm := r.app.screens[screenDetailMovie].(*detailMovieScreen)
-		// dm.setItem(m.item)
-		_ = m.item
+		dm := r.app.screens[screenDetailMovie].(*detailMovieScreen)
+		dm.setItem(m.item)
 		return nil, screenDetailMovie
 	}
 	return nil, -1
