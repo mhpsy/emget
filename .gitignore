@@ -1,0 +1,28 @@
+# Secrets — never commit credentials
+.env
+.env.*
+!.env.example
+
+# Go build artifacts
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+vendor/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local tool caches / state (if anyone runs the CLI from repo dir)
+.cache/
+.local/
+state.json
+session.json
+*.part
