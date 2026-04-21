@@ -97,3 +97,85 @@ func TestPickVersion_CaseInsensitiveKeywords(t *testing.T) {
 		t.Errorf("got %q, want a (case insensitive match)", got.ID)
 	}
 }
+
+func TestPickSubtitles_ExternalOnlyByDefault(t *testing.T) {
+	streams := []emby.MediaStream{
+		{Index: 0, Type: "Video"},
+		{Index: 1, Type: "Audio"},
+		{Index: 2, Type: "Subtitle", Language: "zho", IsExternal: true},
+		{Index: 3, Type: "Subtitle", Language: "zho", IsExternal: false}, // embedded — skipped
+	}
+	rule := SubtitleRule{Languages: []string{"zho"}, External: true}
+	got := PickSubtitles(streams, rule)
+	if len(got) != 1 {
+		t.Fatalf("got %d, want 1 external zho", len(got))
+	}
+	if got[0].Index != 2 {
+		t.Errorf("Index = %d, want 2", got[0].Index)
+	}
+}
+
+func TestPickSubtitles_PreservesLanguageOrder(t *testing.T) {
+	streams := []emby.MediaStream{
+		{Index: 5, Type: "Subtitle", Language: "eng", IsExternal: true},
+		{Index: 6, Type: "Subtitle", Language: "zho", IsExternal: true},
+	}
+	rule := SubtitleRule{Languages: []string{"zho", "eng"}, External: true}
+	got := PickSubtitles(streams, rule)
+	if len(got) != 2 {
+		t.Fatalf("got %d", len(got))
+	}
+	if got[0].Language != "zho" || got[1].Language != "eng" {
+		t.Errorf("order = %q, %q; want zho, eng", got[0].Language, got[1].Language)
+	}
+}
+
+func TestPickSubtitles_SkipsUnmatchedLanguages(t *testing.T) {
+	streams := []emby.MediaStream{
+		{Index: 1, Type: "Subtitle", Language: "fra", IsExternal: true},
+		{Index: 2, Type: "Subtitle", Language: "jpn", IsExternal: true},
+	}
+	rule := SubtitleRule{Languages: []string{"zho", "eng"}, External: true}
+	got := PickSubtitles(streams, rule)
+	if len(got) != 0 {
+		t.Errorf("got %d, want 0", len(got))
+	}
+}
+
+func TestPickSubtitles_MultipleStreamsSameLanguage(t *testing.T) {
+	streams := []emby.MediaStream{
+		{Index: 1, Type: "Subtitle", Language: "zho", IsExternal: true, Title: "Simplified"},
+		{Index: 2, Type: "Subtitle", Language: "zho", IsExternal: true, Title: "Traditional"},
+		{Index: 3, Type: "Subtitle", Language: "eng", IsExternal: true},
+	}
+	rule := SubtitleRule{Languages: []string{"zho"}, External: true}
+	got := PickSubtitles(streams, rule)
+	if len(got) != 2 {
+		t.Fatalf("got %d, want 2 (both zho)", len(got))
+	}
+	if got[0].Index != 1 || got[1].Index != 2 {
+		t.Errorf("indices = %d,%d", got[0].Index, got[1].Index)
+	}
+}
+
+func TestPickSubtitles_EmptyInputReturnsEmpty(t *testing.T) {
+	got := PickSubtitles(nil, SubtitleRule{Languages: []string{"zho"}, External: true})
+	if len(got) != 0 {
+		t.Errorf("got %d, want 0", len(got))
+	}
+}
+
+func TestPickSubtitles_IncludeInternalWhenExternalFalse(t *testing.T) {
+	streams := []emby.MediaStream{
+		{Index: 1, Type: "Subtitle", Language: "zho", IsExternal: true},
+		{Index: 2, Type: "Subtitle", Language: "zho", IsExternal: false},
+	}
+	rule := SubtitleRule{Languages: []string{"zho"}, External: false}
+	got := PickSubtitles(streams, rule)
+	if len(got) != 1 {
+		t.Fatalf("got %d, want 1 internal", len(got))
+	}
+	if got[0].Index != 2 {
+		t.Errorf("Index = %d, want 2", got[0].Index)
+	}
+}

@@ -76,3 +76,56 @@ func sourceHeight(src *emby.MediaSource) int {
 	}
 	return 0
 }
+
+// SubtitleRule filters MediaStreams of type "Subtitle".
+type SubtitleRule struct {
+	Languages []string
+	External  bool
+}
+
+// PickSubtitles returns MediaStreams of type "Subtitle" where IsExternal==rule.External
+// and Language is in rule.Languages. Output is stable-sorted by the position of
+// the language in rule.Languages (primary) then by the stream's original order
+// (secondary). Non-matching streams are dropped.
+func PickSubtitles(streams []emby.MediaStream, rule SubtitleRule) []emby.MediaStream {
+	langOrder := map[string]int{}
+	for i, l := range rule.Languages {
+		langOrder[l] = i
+	}
+	type indexed struct {
+		pos    int
+		stream emby.MediaStream
+	}
+	var matched []indexed
+	for i, s := range streams {
+		if s.Type != "Subtitle" {
+			continue
+		}
+		if s.IsExternal != rule.External {
+			continue
+		}
+		if _, ok := langOrder[s.Language]; !ok {
+			continue
+		}
+		matched = append(matched, indexed{pos: i, stream: s})
+	}
+	// Sort by language order, then by original position (stable).
+	for i := 1; i < len(matched); i++ {
+		for j := i; j > 0; j-- {
+			a, b := matched[j-1], matched[j]
+			ai, bi := langOrder[a.stream.Language], langOrder[b.stream.Language]
+			if ai < bi {
+				break
+			}
+			if ai == bi && a.pos <= b.pos {
+				break
+			}
+			matched[j-1], matched[j] = b, a
+		}
+	}
+	out := make([]emby.MediaStream, len(matched))
+	for i, m := range matched {
+		out[i] = m.stream
+	}
+	return out
+}
