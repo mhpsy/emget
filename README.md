@@ -48,7 +48,7 @@ download:
 4. `↑/↓` to move; `space` toggles subtitle selection
 5. `d` enqueues video + selected subtitles
 6. `p` opens progress/queue panel; `esc` returns to search
-7. `q` quits
+7. `ctrl+c` quits
 
 ## Manual E2E verification
 

@@ -79,14 +79,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.width = m.Width
 		a.height = m.Height
 	case tea.KeyMsg:
-		// global keys
-		switch m.String() {
-		case "ctrl+c", "q":
-			if a.current != screenSearch {
-				// non-destructive back on first; only quit from search via q
-			}
+		// ctrl+c is always quit; "q" and other keys are delegated to the active screen
+		if m.String() == "ctrl+c" {
 			return a, tea.Quit
-		case "p":
+		}
+		if m.String() == "p" {
 			a.current = screenProgress
 			return a, a.screens[a.current].Init()
 		}
