@@ -1,0 +1,5 @@
+{
+  "User": {"Id": "user-123", "Name": "mhpsy"},
+  "AccessToken": "tok-abc",
+  "ServerId": "srv-xyz"
+}
