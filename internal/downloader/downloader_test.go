@@ -60,3 +60,61 @@ func TestDownload_ServerError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestDownload_ResumesFromPart(t *testing.T) {
+	full := []byte("aaaabbbbccccdddd") // 16 bytes
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rng := r.Header.Get("Range")
+		if rng != "bytes=8-" {
+			t.Errorf("Range = %q, want bytes=8-", rng)
+		}
+		w.Header().Set("Content-Range", "bytes 8-15/16")
+		w.Header().Set("Content-Length", "8")
+		w.WriteHeader(206)
+		w.Write(full[8:])
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	out := filepath.Join(dir, "movie.mkv")
+	if err := os.WriteFile(out+".part", full[:8], 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	d := New(srv.Client())
+	task := &Task{URL: srv.URL, OutputPath: out}
+	if err := d.Run(context.Background(), task, nil); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	data, _ := os.ReadFile(out)
+	if string(data) != string(full) {
+		t.Errorf("content = %q, want %q", data, full)
+	}
+}
+
+func TestDownload_ServerIgnoresRange_Restarts(t *testing.T) {
+	full := []byte("FULLCONTENTX")
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		// ignore Range; always return 200 full body
+		w.Header().Set("Content-Length", "12")
+		w.WriteHeader(200)
+		w.Write(full)
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	out := filepath.Join(dir, "movie.mkv")
+	os.WriteFile(out+".part", []byte("STALE4"), 0o644) // 6 bytes of stale data
+
+	d := New(srv.Client())
+	err := d.Run(context.Background(), &Task{URL: srv.URL, OutputPath: out}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(out)
+	if string(data) != string(full) {
+		t.Errorf("content = %q, want %q", data, full)
+	}
+}
