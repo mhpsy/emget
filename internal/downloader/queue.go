@@ -43,19 +43,22 @@ type Event struct {
 }
 
 type Queue struct {
-	cfg    QueueConfig
-	tasks  chan *Task
-	events chan Event
-	stopCh chan struct{}
-	wg     sync.WaitGroup
+	cfg      QueueConfig
+	tasks    chan *Task
+	events   chan Event
+	stopCh   chan struct{}
+	wg       sync.WaitGroup
+	mu       sync.Mutex
+	canceled map[string]bool
 }
 
 func NewQueue(cfg QueueConfig) *Queue {
 	return &Queue{
-		cfg:    cfg,
-		tasks:  make(chan *Task, 256),
-		events: make(chan Event, 256),
-		stopCh: make(chan struct{}),
+		cfg:      cfg,
+		tasks:    make(chan *Task, 256),
+		events:   make(chan Event, 256),
+		stopCh:   make(chan struct{}),
+		canceled: map[string]bool{},
 	}
 }
 
@@ -121,6 +124,13 @@ func (q *Queue) sleepThrottle(ctx context.Context) {
 }
 
 func (q *Queue) runOne(ctx context.Context, t *Task) {
+	if q.isCanceled(t.ID) {
+		t.Status = StatusFailed
+		t.LastError = "canceled by user"
+		q.upsert(t)
+		q.emit(Event{Kind: EventFailed, Task: t, Err: fmt.Errorf("canceled")})
+		return
+	}
 	t.Status = StatusDownloading
 	t.Attempts++
 	q.upsert(t)
@@ -174,4 +184,31 @@ func (q *Queue) emit(e Event) {
 	default:
 		// drop if nobody listening; Events channel has 256 buffer
 	}
+}
+
+// Retry re-enqueues a previously-failed task for another attempt.
+// Resets its status and progress counters.
+func (q *Queue) Retry(t *Task) {
+	t.Status = StatusQueued
+	t.LastError = ""
+	t.Downloaded = 0
+	if q.cfg.Store != nil {
+		q.cfg.Store.Upsert(t)
+		_ = q.cfg.Store.Save()
+	}
+	q.tasks <- t
+}
+
+// Cancel marks a queued task to be skipped when the runner reaches it.
+// Has no effect on the currently-running task (use context cancel for that).
+func (q *Queue) Cancel(taskID string) {
+	q.mu.Lock()
+	q.canceled[taskID] = true
+	q.mu.Unlock()
+}
+
+func (q *Queue) isCanceled(taskID string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.canceled[taskID]
 }

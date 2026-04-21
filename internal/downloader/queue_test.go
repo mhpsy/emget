@@ -201,3 +201,91 @@ func TestQueue_RecoversFromPanicInRunner(t *testing.T) {
 		}
 	}
 }
+
+// runnerFunc adapts a function into a Runner.
+type runnerFunc func(ctx context.Context, t *Task, p ProgressFn) error
+
+func (f runnerFunc) Run(ctx context.Context, t *Task, p ProgressFn) error { return f(ctx, t, p) }
+
+// waitFor blocks until evFn matches an event or a 2s timeout elapses.
+func waitFor(t *testing.T, ch <-chan Event, evFn func(Event) bool) {
+	t.Helper()
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-ch:
+			if evFn(ev) {
+				return
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for event")
+		}
+	}
+}
+
+func TestQueue_RetryReenqueuesFailedTask(t *testing.T) {
+	fs := &fakeStore{}
+	attempts := atomic.Int32{}
+	runner := runnerFunc(func(ctx context.Context, task *Task, p ProgressFn) error {
+		n := attempts.Add(1)
+		if n == 1 {
+			return errors.New("first attempt fails")
+		}
+		return nil
+	})
+	q := NewQueue(QueueConfig{
+		Runner:     runner,
+		Store:      fs,
+		MaxRetries: 0,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	q.Start(ctx)
+	defer q.Stop()
+
+	done := make(chan Event, 16)
+	go func() {
+		for ev := range q.Events() {
+			select {
+			case done <- ev:
+			default:
+			}
+		}
+	}()
+
+	task := &Task{ID: "retry-1"}
+	q.Enqueue(task)
+	waitFor(t, done, func(ev Event) bool { return ev.Kind == EventFailed && ev.Task.ID == "retry-1" })
+
+	q.Retry(task)
+	waitFor(t, done, func(ev Event) bool { return ev.Kind == EventCompleted && ev.Task.ID == "retry-1" })
+}
+
+func TestQueue_CancelSkipsQueuedTask(t *testing.T) {
+	fs := &fakeStore{}
+	fr := &fakeRunner{}
+	q := NewQueue(QueueConfig{
+		Runner: fr,
+		Store:  fs,
+		Delay:  100 * time.Millisecond,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	q.Start(ctx)
+	defer q.Stop()
+
+	q.Enqueue(&Task{ID: "a"})
+	q.Enqueue(&Task{ID: "b"})
+	q.Enqueue(&Task{ID: "c"})
+
+	q.Cancel("b")
+
+	timeout := time.After(3 * time.Second)
+	for fr.ran.Load() < 2 {
+		select {
+		case <-timeout:
+			t.Fatalf("expected ran=2 (a and c ran, b was canceled before run), got %d", fr.ran.Load())
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
