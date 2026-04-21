@@ -150,6 +150,13 @@ func (c *Config) applyDefaults() {
 	if c.Logging.Level == "" {
 		c.Logging.Level = "info"
 	}
+	if c.Logging.File == "" {
+		if dir, err := DataDir(); err == nil {
+			c.Logging.File = dir + "/emget.log"
+		} else {
+			c.Logging.File = "emget.log"
+		}
+	}
 }
 
 func (c *Config) validate() error {

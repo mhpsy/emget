@@ -104,6 +104,27 @@ download:
 	}
 }
 
+func TestLoad_AppliesLoggingFileDefault(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	content := `
+emby:
+  endpoint: https://example.com
+  username: user
+  password: pw
+download:
+  output_dir: /tmp/media
+`
+	os.WriteFile(path, []byte(content), 0o600)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Logging.File == "" {
+		t.Error("logging.file default was not applied")
+	}
+}
+
 func TestLoad_RequiredFieldsMissing(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
