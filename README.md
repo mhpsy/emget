@@ -4,7 +4,7 @@ A Go TUI CLI for downloading movies (and, coming soon, TV series) from an Emby s
 
 ## Status
 
-**v0.2.0 — Movies and TV series.** Log rotation, startup recovery, and automatic re-auth land in v0.3.
+**v0.3.0 — Hardened release.** Movies, TV series, log rotation, startup recovery for unfinished tasks, and session expiry handling.
 
 ## Install / build
 
@@ -55,7 +55,7 @@ download:
 7. `Tab` or `Enter` on a season to expand its episodes (lazy-loaded)
 8. `Space` on an episode toggles selection; `Space` on a season toggles all its loaded episodes
 9. `d` enqueues every selected episode using `versions` and `subtitles` rules from your config; episodes with no matching version are reported as skipped
-10. `p` opens progress/queue panel; `esc` returns to search
+10. `p` opens progress/queue panel; inside the panel use `↑/↓` to highlight a task, `[r]` to retry a failed task, `[x]` to cancel a queued task, `esc` returns
 11. `ctrl+c` quits
 
 ## Series matching rules
@@ -74,6 +74,23 @@ versions:
 Scoring per MediaSource is `resolution_score × 1000 + keyword_score`. If an episode has no MediaSource whose resolution appears in `resolution_order` (and which has zero keyword hits), that episode is skipped — not failed. The final flash message reports the skip count.
 
 Subtitle streams are filtered to external subs only; non-matching languages are ignored.
+
+## Startup recovery
+
+If emget exits with unfinished downloads, the next launch shows a recovery screen listing the tasks and three options:
+
+- `[Y]` resume — re-enqueues unfinished tasks; downloads continue from their `.part` files via Range
+- `[N]` clear — wipes the state file and starts fresh
+- `[esc]` skip — keeps state as-is, starts at the search screen without re-enqueueing
+
+The log file is rotated once it exceeds 10 MiB (keeps one previous generation as `<log>.1`).
+
+## Session handling
+
+Session tokens are cached at `$XDG_CACHE_HOME/emget/session.json` with a conservative 30-day expiry. On startup:
+- If the cached session is valid, emget uses it directly.
+- If expired, emget re-authenticates with the config credentials (reusing the cached DeviceID so Emby's session history stays clean).
+- Mid-session 401s are logged but not auto-recovered in v0.3; restart emget if you see auth failures in the TUI.
 
 ## Manual E2E verification
 
@@ -95,6 +112,12 @@ Before cutting a release, verify against a real Emby server:
 - [ ] Pressing `d` enqueues one video + N subtitle tasks per selected episode, with correct TV naming under `<output>/TV/<Series>/Season NN/...`
 - [ ] An episode with no version matching `resolution_order` is counted in the "skipped" tally rather than failing
 - [ ] TV subtitle files land next to the video with `.lang.ext` suffix, matching Emby/Plex/Jellyfin conventions
+- [ ] Log file at `~/.local/share/emget/emget.log` rotates to `.log.1` when size exceeds 10 MiB
+- [ ] Quitting mid-download and restarting triggers the recovery prompt with the correct count
+- [ ] Pressing `Y` on the recovery prompt resumes downloads (re-enqueues tasks); `N` clears state; `esc` starts fresh without clearing
+- [ ] Expired session is automatically re-authenticated on startup
+- [ ] Progress panel: `↑/↓` highlights tasks; `[r]` on a failed task retries it; `[x]` on a queued task skips it
+- [ ] Panic in the runner (simulated via network error plus a buggy callback) does not halt the queue — next task still runs
 
 ## Paths
 
