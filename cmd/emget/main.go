@@ -72,11 +72,16 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	if sess, err := config.LoadSession(sessionPath); err == nil {
+	if sess, err := config.LoadSession(sessionPath); err == nil && sess.ExpiresAt.After(time.Now()) {
 		client.SetSession(embySession(sess))
-		log.Info("loaded existing session", "user_id", sess.UserID)
+		log.Info("loaded existing session", "user_id", sess.UserID, "expires_at", sess.ExpiresAt)
 	} else {
-		client.SetDeviceID(uuid.NewString())
+		if err == nil {
+			log.Info("session expired, will reauthenticate", "expired_at", sess.ExpiresAt)
+			client.SetDeviceID(sess.DeviceID)
+		} else {
+			client.SetDeviceID(uuid.NewString())
+		}
 	}
 
 	if !client.IsAuthenticated() {
