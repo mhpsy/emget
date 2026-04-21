@@ -48,10 +48,8 @@ func (s *searchScreen) Update(msg tea.Msg) (tea.Cmd, screenID) {
 		if m.err != nil {
 			return flash("search failed: "+m.err.Error(), true), -1
 		}
-		// FIXME(task-19): restore once resultsScreen exists
-		// rs := s.app.screens[screenResults].(*resultsScreen)
-		// rs.setResults(m.items, s.input.Value())
-		_ = m.items
+		rs := s.app.screens[screenResults].(*resultsScreen)
+		rs.setResults(m.items, s.input.Value())
 		return nil, screenResults
 	}
 	var cmd tea.Cmd
