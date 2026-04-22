@@ -29,6 +29,8 @@ type detailSeriesScreen struct {
 	selected map[string]bool // episode IDs currently checked
 
 	cursor int
+	offset int
+	height int
 }
 
 type row struct {
@@ -69,6 +71,7 @@ func (d *detailSeriesScreen) setSeries(it *emby.Item) {
 	d.expanded = map[string]bool{}
 	d.selected = map[string]bool{}
 	d.cursor = 0
+	d.offset = 0
 }
 
 type seasonsLoadedMsg struct {
@@ -96,6 +99,9 @@ func (d *detailSeriesScreen) Init() tea.Cmd {
 
 func (d *detailSeriesScreen) Update(msg tea.Msg) (tea.Cmd, screenID) {
 	switch m := msg.(type) {
+	case tea.WindowSizeMsg:
+		d.height = m.Height
+		return nil, -1
 	case seasonsLoadedMsg:
 		d.loadingSeasons = false
 		if m.err != nil {
@@ -131,6 +137,20 @@ func (d *detailSeriesScreen) handleKey(m tea.KeyMsg) (tea.Cmd, screenID) {
 		if d.cursor < len(rows)-1 {
 			d.cursor++
 		}
+	case "pgup":
+		d.cursor -= d.visibleRows() / 2
+		if d.cursor < 0 {
+			d.cursor = 0
+		}
+	case "pgdown":
+		d.cursor += d.visibleRows() / 2
+		if d.cursor >= len(rows) {
+			d.cursor = len(rows) - 1
+		}
+	case "home", "g":
+		d.cursor = 0
+	case "end", "G":
+		d.cursor = len(rows) - 1
 	case "tab", "enter":
 		if d.cursor < len(rows) && rows[d.cursor].kind == rowSeason {
 			return d.toggleSeason(rows[d.cursor].seasonID), -1
@@ -192,6 +212,20 @@ func (d *detailSeriesScreen) toggleSeason(seasonID string) tea.Cmd {
 	}
 }
 
+// visibleRows is the number of rows we can draw given terminal height
+// and a ~6-line chrome budget (title/year + spacer + status + hint).
+func (d *detailSeriesScreen) visibleRows() int {
+	h := d.height
+	if h <= 0 {
+		h = 24
+	}
+	n := h - 6
+	if n < 3 {
+		n = 3
+	}
+	return n
+}
+
 func (d *detailSeriesScreen) rows() []row {
 	rows := make([]row, 0, len(d.seasons)*2)
 	for i := range d.seasons {
@@ -243,17 +277,31 @@ func (d *detailSeriesScreen) View() string {
 		b.WriteString("\n" + infoStyle.Render("esc: back"))
 		return b.String()
 	}
-	for i, r := range rows {
+	size := d.visibleRows()
+	d.offset = scrollOffset(d.cursor, d.offset, size, len(rows))
+	above, below := scrollIndicators(d.offset, size, len(rows))
+	if above != "" {
+		b.WriteString(infoStyle.Render(above) + "\n")
+	}
+	end := d.offset + size
+	if end > len(rows) {
+		end = len(rows)
+	}
+	for i := d.offset; i < end; i++ {
+		r := rows[i]
 		line := d.renderRow(r)
 		if i == d.cursor {
 			line = selectedStyle.Render("> " + strings.TrimPrefix(line, "  "))
 		}
 		b.WriteString(line + "\n")
 	}
+	if below != "" {
+		b.WriteString(infoStyle.Render(below) + "\n")
+	}
 	count := d.selectedCount()
 	status := fmt.Sprintf("%d episode(s) selected", count)
 	b.WriteString("\n" + infoStyle.Render(status))
-	b.WriteString("\n" + infoStyle.Render("tab/enter: expand, space: select, d: enqueue, ↑/↓ move, esc: back"))
+	b.WriteString("\n" + infoStyle.Render("tab/enter: expand, space: select, d: enqueue, ↑/↓ move, PgUp/PgDn half-page, g/G first/last, esc: back"))
 	return b.String()
 }
 
