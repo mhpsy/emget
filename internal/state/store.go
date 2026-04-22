@@ -111,6 +111,26 @@ func (s *Store) Clear() {
 	s.order = nil
 }
 
+// RemoveWhere removes all tasks for which pred returns true.
+// Returns the count removed. Does not call Save().
+func (s *Store) RemoveWhere(pred func(*downloader.Task) bool) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var kept []string
+	removed := 0
+	for _, id := range s.order {
+		t := s.tasks[id]
+		if pred(t) {
+			delete(s.tasks, id)
+			removed++
+			continue
+		}
+		kept = append(kept, id)
+	}
+	s.order = kept
+	return removed
+}
+
 func (s *Store) Tasks() []*downloader.Task {
 	s.mu.Lock()
 	defer s.mu.Unlock()

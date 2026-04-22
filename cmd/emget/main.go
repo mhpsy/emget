@@ -61,6 +61,25 @@ func dispatch(args []string) error {
 			cp = filepath.Join(dir, "config.yaml")
 		}
 		return runConfig(runConfigOpts{configPath: cp, pathsOnly: *pathsOnly, raw: *raw, stdout: os.Stdout})
+	case "clean":
+		fs := flag.NewFlagSet("clean", flag.ExitOnError)
+		completedOnly := fs.Bool("completed-only", false, "only remove completed tasks")
+		failedOnly := fs.Bool("failed-only", false, "only remove failed tasks")
+		yes := fs.Bool("yes", false, "skip confirmation")
+		fs.BoolVar(yes, "y", false, "shorthand for --yes")
+		_ = fs.Parse(rest)
+		dir, err := config.DataDir()
+		if err != nil {
+			return err
+		}
+		return runClean(runCleanOpts{
+			statePath:     filepath.Join(dir, "state.json"),
+			completedOnly: *completedOnly,
+			failedOnly:    *failedOnly,
+			yes:           *yes,
+			stdout:        os.Stdout,
+			stdin:         os.Stdin,
+		})
 	default:
 		printUsage(os.Stderr)
 		return fmt.Errorf("unknown command: %s", cmd)
