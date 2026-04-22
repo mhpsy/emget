@@ -94,6 +94,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		a.width = m.Width
 		a.height = m.Height
+		// Forward to the active screen so lists can compute viewport size.
+		cmd, _ := a.screens[a.current].Update(msg)
+		return a, cmd
 	case tea.KeyMsg:
 		// ctrl+c is always quit; "q" and other keys are delegated to the active screen
 		if m.String() == "ctrl+c" {
