@@ -13,6 +13,8 @@ type resultsScreen struct {
 	app    *App
 	items  []emby.Item
 	cursor int
+	offset int
+	height int
 	term   string
 }
 
@@ -24,6 +26,7 @@ func (r *resultsScreen) setResults(items []emby.Item, term string) {
 	r.items = items
 	r.term = term
 	r.cursor = 0
+	r.offset = 0
 }
 
 func (r *resultsScreen) Init() tea.Cmd { return nil }
@@ -35,6 +38,8 @@ type loadMovieDetailMsg struct {
 
 func (r *resultsScreen) Update(msg tea.Msg) (tea.Cmd, screenID) {
 	switch m := msg.(type) {
+	case tea.WindowSizeMsg:
+		r.height = m.Height
 	case tea.KeyMsg:
 		switch m.String() {
 		case "up", "k":
@@ -45,6 +50,20 @@ func (r *resultsScreen) Update(msg tea.Msg) (tea.Cmd, screenID) {
 			if r.cursor < len(r.items)-1 {
 				r.cursor++
 			}
+		case "pgup":
+			r.cursor -= r.visibleRows() / 2
+			if r.cursor < 0 {
+				r.cursor = 0
+			}
+		case "pgdown":
+			r.cursor += r.visibleRows() / 2
+			if r.cursor >= len(r.items) {
+				r.cursor = len(r.items) - 1
+			}
+		case "home", "g":
+			r.cursor = 0
+		case "end", "G":
+			r.cursor = len(r.items) - 1
 		case "enter":
 			if len(r.items) == 0 {
 				return nil, -1
@@ -82,15 +101,40 @@ func (r *resultsScreen) loadMovieDetail(id string) tea.Cmd {
 	}
 }
 
+// visibleRows is the number of result rows we can draw given terminal
+// height and a ~5-line chrome budget (title/header + hint + flash).
+func (r *resultsScreen) visibleRows() int {
+	h := r.height
+	if h <= 0 {
+		h = 24
+	}
+	n := h - 5
+	if n < 3 {
+		n = 3
+	}
+	return n
+}
+
 func (r *resultsScreen) View() string {
 	if len(r.items) == 0 {
 		return infoStyle.Render(fmt.Sprintf("no results for %q\n\nesc: back", r.term))
 	}
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("%d results for %q\n\n", len(r.items), r.term))
-	for i, it := range r.items {
-		marker := "  "
-		line := fmt.Sprintf("%s [%s] %s", marker, string(it.Type), it.Name)
+
+	size := r.visibleRows()
+	r.offset = scrollOffset(r.cursor, r.offset, size, len(r.items))
+	above, below := scrollIndicators(r.offset, size, len(r.items))
+	if above != "" {
+		b.WriteString(infoStyle.Render(above) + "\n")
+	}
+	end := r.offset + size
+	if end > len(r.items) {
+		end = len(r.items)
+	}
+	for i := r.offset; i < end; i++ {
+		it := r.items[i]
+		line := fmt.Sprintf("  [%s] %s", string(it.Type), it.Name)
 		if it.ProductionYear > 0 {
 			line += fmt.Sprintf(" (%d)", it.ProductionYear)
 		}
@@ -99,6 +143,9 @@ func (r *resultsScreen) View() string {
 		}
 		b.WriteString(line + "\n")
 	}
-	b.WriteString("\n" + infoStyle.Render("↑/↓ move, enter: details, esc: back"))
+	if below != "" {
+		b.WriteString(infoStyle.Render(below) + "\n")
+	}
+	b.WriteString("\n" + infoStyle.Render("↑/↓ move, PgUp/PgDn half-page, g/G first/last, enter: details, esc: back"))
 	return b.String()
 }
