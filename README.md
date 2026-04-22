@@ -1,66 +1,116 @@
 # emget
 
-A Go TUI CLI for downloading movies (and, coming soon, TV series) from an Emby server. Strictly serial downloads with Range-based resume and retry-with-backoff.
+> TUI + CLI Emby media downloader. Single-connection, resumable, versioned.
+>
+> Languages: **English** · [中文](README.zh-CN.md)
 
-## Status
+[![CI](https://github.com/mhpsy/emget/actions/workflows/ci.yml/badge.svg)](https://github.com/mhpsy/emget/actions/workflows/ci.yml)
 
-**v0.3.0 — Hardened release.** Movies, TV series, log rotation, startup recovery for unfinished tasks, and session expiry handling.
+A Go CLI that downloads movies and TV series from an Emby server. Strictly serial downloads with Range-based resume and retry-with-backoff. Ships with a bubbletea TUI and four standalone subcommands for scripting.
 
-## Install / build
+## Install
 
-```bash
-make build   # produces bin/emget
+### From source
+
+```sh
+go install github.com/mhpsy/emget/cmd/emget@latest
 ```
 
-Requires Go 1.22+.
+Or from a clone:
 
-## Configure
-
-First run writes a template:
-
-```bash
-./bin/emget
-# emget: wrote template to ~/.config/emget/config.yaml — fill it in and re-run
+```sh
+make build   # produces bin/emget with version ldflags
 ```
 
-Edit `~/.config/emget/config.yaml`:
+Requires Go 1.24+.
 
-```yaml
-emby:
-  endpoint: https://your-emby.example.com
-  username: your-username
-  password: your-password
+### From a release
 
-download:
-  output_dir: ~/Media
-  # (optional overrides; see template for full list)
+Download the archive for your platform from the [releases page](https://github.com/mhpsy/emget/releases) and extract `emget` (or `emget.exe`) into a directory on your `PATH`.
+
+Available platforms: linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64.
+
+## First-time setup
+
+On first run, emget writes a config template and exits:
+
+```sh
+emget
+# emget: wrote template to <path> — fill it in and re-run
 ```
+
+Edit the template (point `emby.*` at your server), then re-run.
+
+### Config paths per OS
+
+| OS      | Config                                        | Cache                        | Data                                      |
+|---------|-----------------------------------------------|------------------------------|-------------------------------------------|
+| Linux   | `$XDG_CONFIG_HOME/emget` or `~/.config/emget` | `~/.cache/emget`             | `~/.local/share/emget`                    |
+| macOS   | `~/Library/Application Support/emget`         | `~/Library/Caches/emget`     | `~/Library/Application Support/emget`     |
+| Windows | `%AppData%\emget`                             | `%LocalAppData%\emget\cache` | `%AppData%\emget`                         |
+
+Run `emget config --paths-only` to print the exact paths on your machine.
 
 ## Usage
 
-```bash
-./bin/emget
+```
+emget                  Launch the TUI (default)
+emget tui              Launch the TUI (explicit)
+emget tasks [flags]    List queued/active/finished tasks
+emget clean [flags]    Remove tasks from the state store
+emget config [flags]   Print config paths and contents
+emget version          Print version and build info
+emget help             Show help
 ```
 
-1. Type a search term, press Enter
-2. `↑/↓` to navigate results, Enter to open detail
+### TUI keys
 
-**Movie detail:**
-3. `Tab` to switch between versions and subtitles panes
-4. `↑/↓` to move; `space` toggles subtitle selection
-5. `d` enqueues video + selected subtitles
+- `↑/↓` or `k/j` — move cursor
+- `PgUp / PgDn` — half-page
+- `Home / g`, `End / G` — jump to first / last
+- `Enter` — open detail / expand season
+- `Space` — toggle selection (multi-select screens)
+- `Tab` — expand / switch pane
+- `d` — enqueue selected
+- `p` — open Progress screen (global)
+- `esc` — back
+- `Ctrl+C` — quit
 
-**Series detail:**
-6. `↑/↓` to navigate seasons/episodes
-7. `Tab` or `Enter` on a season to expand its episodes (lazy-loaded)
-8. `Space` on an episode toggles selection; `Space` on a season toggles all its loaded episodes
-9. `d` enqueues every selected episode using `versions` and `subtitles` rules from your config; episodes with no matching version are reported as skipped
-10. `p` opens progress/queue panel; inside the panel use `↑/↓` to highlight a task, `[r]` to retry a failed task, `[x]` to cancel a queued task, `esc` returns
-11. `ctrl+c` quits
+Progress screen adds:
+- `r` — retry a failed task
+- `x` — cancel a queued task
+
+### `emget tasks`
+
+```sh
+emget tasks                        # all tasks, grouped by status
+emget tasks --status=failed        # only failed
+emget tasks --status=queued,completed
+emget tasks --format=json          # raw JSON array
+```
+
+### `emget clean`
+
+```sh
+emget clean                # prompt, then remove all tasks
+emget clean --yes          # no prompt
+emget clean --completed-only
+emget clean --failed-only
+```
+
+Mutually-exclusive flags return an error.
+
+### `emget config`
+
+```sh
+emget config               # print paths + parsed YAML (password redacted)
+emget config --paths-only  # only print paths
+emget config --raw         # print file as-is (password NOT redacted; warning banner)
+```
 
 ## Series matching rules
 
-When you press `d` on the Detail Series screen, emget picks one version and zero-or-more subtitle streams per selected episode automatically, using rules from your `config.yaml`:
+When you press `d` on the Detail Series screen, emget picks one version and zero-or-more subtitle streams per selected episode automatically, using rules from `config.yaml`:
 
 ```yaml
 subtitles:
@@ -68,60 +118,36 @@ subtitles:
 
 versions:
   resolution_order: [2160, 1080, 720, 480]   # preferred heights, best first
-  keyword_boost: [BluRay, REMUX, WEB-DL]     # tie-breakers (case-insensitive substring match on source name)
+  keyword_boost: [BluRay, REMUX, WEB-DL]     # tie-breakers (case-insensitive)
 ```
 
-Scoring per MediaSource is `resolution_score × 1000 + keyword_score`. If an episode has no MediaSource whose resolution appears in `resolution_order` (and which has zero keyword hits), that episode is skipped — not failed. The final flash message reports the skip count.
-
-Subtitle streams are filtered to external subs only; non-matching languages are ignored.
+Scoring per MediaSource is `resolution_score × 1000 + keyword_score`. Episodes with no matching version are skipped (not failed); the flash message reports the skip count.
 
 ## Startup recovery
 
-If emget exits with unfinished downloads, the next launch shows a recovery screen listing the tasks and three options:
+If emget exits with unfinished downloads, the next launch shows a recovery screen:
 
-- `[Y]` resume — re-enqueues unfinished tasks; downloads continue from their `.part` files via Range
-- `[N]` clear — wipes the state file and starts fresh
-- `[esc]` skip — keeps state as-is, starts at the search screen without re-enqueueing
+- `[Y]` resume — re-enqueue unfinished tasks (continues from `.part` files via Range)
+- `[N]` clear — wipe the state file and start fresh
+- `[esc]` skip — keep state as-is, start at the search screen
 
-The log file is rotated once it exceeds 10 MiB (keeps one previous generation as `<log>.1`).
+The log file rotates once it exceeds 10 MiB (keeps one previous generation as `<log>.1`).
 
-## Session handling
+## Features by version
 
-Session tokens are cached at `$XDG_CACHE_HOME/emget/session.json` with a conservative 30-day expiry. On startup:
-- If the cached session is valid, emget uses it directly.
-- If expired, emget re-authenticates with the config credentials (reusing the cached DeviceID so Emby's session history stays clean).
-- Mid-session 401s are logged but not auto-recovered in v0.3; restart emget if you see auth failures in the TUI.
+- **v0.1** — movies: search, version pick, external subtitle multi-select, serial downloads with resume + retry
+- **v0.2** — series: expandable seasons, episode multi-select, matcher-driven enqueue
+- **v0.3** — hardening: startup recovery, log rotation, retry/cancel bindings, panic recovery
+- **v0.4** — CLI subcommands (`tasks` / `clean` / `config` / `version`), Windows + macOS support, list scrolling, GitHub-built multi-platform releases
 
-## Manual E2E verification
+## Developing
 
-Before cutting a release, verify against a real Emby server:
+```sh
+make build    # compile bin/emget with version ldflags
+make test     # run unit tests
+make vet      # go vet ./...
+```
 
-- [ ] Config template writes cleanly when missing
-- [ ] Login succeeds with valid credentials; session cached at `~/.cache/emget/session.json`
-- [ ] Login fails with clear error on bad password
-- [ ] Search for a known movie title returns results
-- [ ] Movie detail shows multiple versions (if available) with sizes
-- [ ] External subtitles list includes expected languages
-- [ ] Enqueue: small file downloads successfully to `<output>/Movies/<Title> (<Year>)/...`
-- [ ] Resume: kill CLI mid-download, restart, confirm `.part` continues from correct byte offset
-- [ ] Retry: temporarily block network, observe backoff in log; on restore, download completes
-- [ ] Ctrl+C twice: clean shutdown, `state.json` reflects final downloaded bytes
-- [ ] Series search returns Series-type results alongside movies
-- [ ] Opening a series loads season list; expanding a season loads episodes lazily
-- [ ] `Space` on an episode toggles an `[x]`; `Space` on a season with all episodes checked clears them all
-- [ ] Pressing `d` enqueues one video + N subtitle tasks per selected episode, with correct TV naming under `<output>/TV/<Series>/Season NN/...`
-- [ ] An episode with no version matching `resolution_order` is counted in the "skipped" tally rather than failing
-- [ ] TV subtitle files land next to the video with `.lang.ext` suffix, matching Emby/Plex/Jellyfin conventions
-- [ ] Log file at `~/.local/share/emget/emget.log` rotates to `.log.1` when size exceeds 10 MiB
-- [ ] Quitting mid-download and restarting triggers the recovery prompt with the correct count
-- [ ] Pressing `Y` on the recovery prompt resumes downloads (re-enqueues tasks); `N` clears state; `esc` starts fresh without clearing
-- [ ] Expired session is automatically re-authenticated on startup
-- [ ] Progress panel: `↑/↓` highlights tasks; `[r]` on a failed task retries it; `[x]` on a queued task skips it
-- [ ] Panic in the runner (simulated via network error plus a buggy callback) does not halt the queue — next task still runs
+## License
 
-## Paths
-
-- Config: `$XDG_CONFIG_HOME/emget/config.yaml` (default `~/.config/emget/config.yaml`)
-- Session cache: `$XDG_CACHE_HOME/emget/session.json`
-- Task state: `$XDG_DATA_HOME/emget/state.json`
-- Logs: path configurable via `logging.file` (default `~/.local/share/emget/emget.log`)
+MIT — `LICENSE` file pending.
