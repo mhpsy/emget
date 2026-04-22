@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -24,7 +25,9 @@ func TestSession_WriteAndRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	// Windows does not honor POSIX perm bits on file creation (os.WriteFile
+	// writes with default ACLs regardless of the mode argument).
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Errorf("perm = %v, want 0o600", info.Mode().Perm())
 	}
 	got, err := LoadSession(path)
