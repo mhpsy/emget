@@ -19,10 +19,10 @@ type runTasksOpts struct {
 	stdout    io.Writer
 }
 
-// statusGroupOrder controls the order that status groups are printed
-// in table format.
+// statusGroupOrder controls the order status groups are printed.
+// StatusDownloading is not listed because state.Store.Load rewrites
+// downloading → queued on startup, so it is never observed here.
 var statusGroupOrder = []downloader.Status{
-	downloader.StatusDownloading,
 	downloader.StatusQueued,
 	downloader.StatusFailed,
 	downloader.StatusCompleted,
@@ -78,29 +78,9 @@ func printTasksTable(w io.Writer, tasks []*downloader.Task) error {
 	}
 
 	first := true
-	printed := map[downloader.Status]bool{}
 	for _, st := range statusGroupOrder {
 		g := groups[st]
 		if len(g) == 0 {
-			continue
-		}
-		printed[st] = true
-		if !first {
-			fmt.Fprintln(w)
-		}
-		first = false
-		fmt.Fprintf(w, "== %s (%d) ==\n", st, len(g))
-		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "ID\tTYPE\tNAME\tPROGRESS\tSIZE")
-		for _, t := range g {
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-				shortID(t.ID), t.Kind, t.DisplayName, formatProgress(t), formatSize(t.TotalSize))
-		}
-		tw.Flush()
-	}
-	// catch-all for any unknown status values that slipped in
-	for st, g := range groups {
-		if printed[st] {
 			continue
 		}
 		if !first {
@@ -137,7 +117,7 @@ func formatProgress(t *downloader.Task) string {
 	if pct > 100 {
 		pct = 100
 	}
-	return fmt.Sprintf("%5.1f%%", pct)
+	return fmt.Sprintf("%.1f%%", pct)
 }
 
 func formatSize(n int64) string {
