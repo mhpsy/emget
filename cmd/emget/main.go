@@ -23,17 +23,36 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	if err := dispatch(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "emget:", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
-	var configPath string
-	flag.StringVar(&configPath, "config", "", "path to config.yaml (default: $XDG_CONFIG_HOME/emget/config.yaml)")
-	flag.Parse()
+func dispatch(args []string) error {
+	if len(args) == 0 {
+		return runTUI("")
+	}
+	cmd := args[0]
+	rest := args[1:]
+	switch cmd {
+	case "tui":
+		fs := flag.NewFlagSet("tui", flag.ExitOnError)
+		configPath := fs.String("config", "", "path to config.yaml")
+		_ = fs.Parse(rest)
+		return runTUI(*configPath)
+	case "version", "-v", "--version":
+		return runVersion(os.Stdout)
+	case "help", "-h", "--help":
+		printUsage(os.Stdout)
+		return nil
+	default:
+		printUsage(os.Stderr)
+		return fmt.Errorf("unknown command: %s", cmd)
+	}
+}
 
+func runTUI(configPath string) error {
 	if configPath == "" {
 		dir, err := config.ConfigDir()
 		if err != nil {
