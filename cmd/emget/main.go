@@ -68,6 +68,9 @@ func dispatch(args []string) error {
 		yes := fs.Bool("yes", false, "skip confirmation")
 		fs.BoolVar(yes, "y", false, "shorthand for --yes")
 		_ = fs.Parse(rest)
+		if *completedOnly && *failedOnly {
+			return fmt.Errorf("--completed-only and --failed-only are mutually exclusive")
+		}
 		dir, err := config.DataDir()
 		if err != nil {
 			return err

@@ -82,3 +82,26 @@ func TestRunClean_PromptNo(t *testing.T) {
 		t.Errorf("expected 'aborted' in output: %s", out.String())
 	}
 }
+
+func TestRunClean_MutuallyExclusiveFlags(t *testing.T) {
+	// Regression: both flags must error at dispatch; runClean itself
+	// silently picks completedOnly first, which is the wrong UX.
+	// This test documents that dispatch (not runClean) is the guard.
+	// runClean called with both flags set behaves like completedOnly:
+	_, path := seedStore(t)
+	var out bytes.Buffer
+	err := runClean(runCleanOpts{
+		statePath:     path,
+		completedOnly: true,
+		failedOnly:    true,
+		yes:           true,
+		stdout:        &out,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Both flags set = completedOnly wins = 1 removed
+	if !strings.Contains(out.String(), "removed 1") {
+		t.Errorf("expected completedOnly behavior when both flags set, got: %s", out.String())
+	}
+}
