@@ -53,7 +53,11 @@ download:
 	if strings.Contains(out, "secret123") {
 		t.Errorf("password leaked: %s", out)
 	}
-	if !strings.Contains(out, "****") {
-		t.Errorf("redaction marker missing: %s", out)
+	// Assert the password FIELD itself contains the redaction marker,
+	// not just that **** appears anywhere in output.
+	if !strings.Contains(out, "password: '****'") &&
+		!strings.Contains(out, `password: "****"`) &&
+		!strings.Contains(out, "password: ****") {
+		t.Errorf("expected password field redacted to ****, got: %s", out)
 	}
 }
