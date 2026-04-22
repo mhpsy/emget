@@ -83,6 +83,21 @@ func dispatch(args []string) error {
 			stdout:        os.Stdout,
 			stdin:         os.Stdin,
 		})
+	case "tasks":
+		fs := flag.NewFlagSet("tasks", flag.ExitOnError)
+		statuses := fs.String("status", "", "comma-separated status filter (queued,downloading,completed,failed)")
+		format := fs.String("format", "table", "output format: table|json")
+		_ = fs.Parse(rest)
+		dir, err := config.DataDir()
+		if err != nil {
+			return err
+		}
+		return runTasks(runTasksOpts{
+			statePath: filepath.Join(dir, "state.json"),
+			statuses:  *statuses,
+			format:    *format,
+			stdout:    os.Stdout,
+		})
 	default:
 		printUsage(os.Stderr)
 		return fmt.Errorf("unknown command: %s", cmd)
