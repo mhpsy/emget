@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -152,7 +153,7 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Logging.File == "" {
 		if dir, err := DataDir(); err == nil {
-			c.Logging.File = dir + "/emget.log"
+			c.Logging.File = filepath.Join(dir, "emget.log")
 		} else {
 			c.Logging.File = "emget.log"
 		}
