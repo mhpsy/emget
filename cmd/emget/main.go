@@ -46,6 +46,21 @@ func dispatch(args []string) error {
 	case "help", "-h", "--help":
 		printUsage(os.Stdout)
 		return nil
+	case "config":
+		fs := flag.NewFlagSet("config", flag.ExitOnError)
+		configPath := fs.String("config", "", "path to config.yaml")
+		pathsOnly := fs.Bool("paths-only", false, "print only paths, not contents")
+		raw := fs.Bool("raw", false, "print raw file (password NOT redacted)")
+		_ = fs.Parse(rest)
+		cp := *configPath
+		if cp == "" {
+			dir, err := config.ConfigDir()
+			if err != nil {
+				return err
+			}
+			cp = filepath.Join(dir, "config.yaml")
+		}
+		return runConfig(runConfigOpts{configPath: cp, pathsOnly: *pathsOnly, raw: *raw, stdout: os.Stdout})
 	default:
 		printUsage(os.Stderr)
 		return fmt.Errorf("unknown command: %s", cmd)
