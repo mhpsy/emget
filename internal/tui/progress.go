@@ -15,14 +15,15 @@ type progressScreen struct {
 	tasks  map[string]*downloader.Task
 	order  []string
 	cursor int
+	offset int
+	height int
 }
 
 func newProgressScreen(a *App) screen {
-	p := &progressScreen{
+	return &progressScreen{
 		app:   a,
 		tasks: map[string]*downloader.Task{},
 	}
-	return p
 }
 
 type queueEventMsg downloader.Event
@@ -36,6 +37,8 @@ func tick() tea.Cmd {
 
 func (p *progressScreen) Update(msg tea.Msg) (tea.Cmd, screenID) {
 	switch m := msg.(type) {
+	case tea.WindowSizeMsg:
+		p.height = m.Height
 	case tea.KeyMsg:
 		switch m.String() {
 		case "esc":
@@ -48,6 +51,20 @@ func (p *progressScreen) Update(msg tea.Msg) (tea.Cmd, screenID) {
 			if p.cursor < len(p.order)-1 {
 				p.cursor++
 			}
+		case "pgup":
+			p.cursor -= p.visibleRows() / 2
+			if p.cursor < 0 {
+				p.cursor = 0
+			}
+		case "pgdown":
+			p.cursor += p.visibleRows() / 2
+			if p.cursor >= len(p.order) {
+				p.cursor = len(p.order) - 1
+			}
+		case "home", "g":
+			p.cursor = 0
+		case "end", "G":
+			p.cursor = len(p.order) - 1
 		case "r":
 			if t := p.currentTask(); t != nil && t.Status == downloader.StatusFailed {
 				p.app.queue.Retry(t)
@@ -94,14 +111,36 @@ func (p *progressScreen) applyEvent(ev downloader.Event) {
 	p.tasks[id] = &tcopy
 }
 
+func (p *progressScreen) visibleRows() int {
+	h := p.height
+	if h <= 0 {
+		h = 24
+	}
+	n := h - 5
+	if n < 3 {
+		n = 3
+	}
+	return n
+}
+
 func (p *progressScreen) View() string {
 	var b strings.Builder
 	b.WriteString("Downloads:\n\n")
 	if len(p.order) == 0 {
 		b.WriteString(infoStyle.Render("(no tasks yet — enqueue from a movie detail)\n"))
 	} else {
-		for i, id := range p.order {
-			t := p.tasks[id]
+		size := p.visibleRows()
+		p.offset = scrollOffset(p.cursor, p.offset, size, len(p.order))
+		above, below := scrollIndicators(p.offset, size, len(p.order))
+		if above != "" {
+			b.WriteString(infoStyle.Render(above) + "\n")
+		}
+		end := p.offset + size
+		if end > len(p.order) {
+			end = len(p.order)
+		}
+		for i := p.offset; i < end; i++ {
+			t := p.tasks[p.order[i]]
 			line := renderTask(t)
 			if i == p.cursor {
 				line = "▸ " + line
@@ -110,8 +149,11 @@ func (p *progressScreen) View() string {
 			}
 			b.WriteString(line + "\n")
 		}
+		if below != "" {
+			b.WriteString(infoStyle.Render(below) + "\n")
+		}
 	}
-	b.WriteString("\n" + infoStyle.Render("↑/↓ move, [r] retry failed, [x] cancel queued, esc: back"))
+	b.WriteString("\n" + infoStyle.Render("↑/↓ move, PgUp/PgDn half-page, g/G first/last, [r] retry failed, [x] cancel queued, esc: back"))
 	return b.String()
 }
 
